@@ -12,6 +12,10 @@
 #
 $here = pwd
 
+# To help with debugging:
+# $Verbose = "HB,""
+$Verbose = ""
+
 # Check to see if HandBrakeCLI has been installed,
 #    and if not, try to install it and remember where it is.
 #
@@ -22,14 +26,18 @@ $HBpath = ""
 
 if (Test-Path ".\$HBname") {
     $HBpath = ".\$HBname"
-    $result = [System.windows.forms.messagebox]::show("The path to $HBname is `"$HBpath`".")
+    if ($Verbose -match 'HB,') {
+        $result = [System.windows.forms.messagebox]::show("The path to $HBname is `"$HBpath`".")
+    }
 }
 else {
     $HBpath = (Get-Command "$HBname" -ErrorAction SilentlyContinue | Select-Object Source).Source
     # $result = [System.windows.forms.messagebox]::show("After test, the path to $HBname is `"$HBpath`".")
     
     if ($HBpath -ne $null ) {  
-        $result = [System.windows.forms.messagebox]::show("The path to $HBname is `"$HBpath`".")
+        if ($Verbose -match 'HB,') {
+            $result = [System.windows.forms.messagebox]::show("The path to $HBname is `"$HBpath`".")            
+        }
     } else {
         $result = [System.windows.forms.messagebox]::show( `
         "$HBname not installed. Please download it and unpack the zip archive into this folder.")
