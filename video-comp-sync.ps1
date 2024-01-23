@@ -7,17 +7,35 @@
 # It will compress the video using built-in parameters, 
 # with output to the syncing folder
 #
+# To help with debugging:
+# $Verbose = "HB,HBdownload,extract,"
+$Verbose = ""
+
+# Set-ExecutionPolicy unrestricted
+
+# Make sure we can do dialogs.
+#
+Add-Type -AssemblyName System.Windows.Forms
+
 # Assuming this script is in the folder where the videos are,
 # we'll get the current working directory.
 #
 $here = pwd
+$programs = ".programs"
+$syncfolder = "$here\SyncWithColleagues"
 
-# To help with debugging:
-# $Verbose = "HB,HBdownload,"
-$Verbose = ""
-
-# Set-ExecutionPolicy unrestricted
-Add-Type -AssemblyName System.Windows.Forms
+# Make sure there is a folder to HandBrakeCLI to be in
+#
+if (-Not (Test-Path ".\$programs")) {
+    mkdir ".\$programs"
+    if (-Not "$?") {
+        $result = [System.windows.forms.messagebox]::show( `
+        "I tried to make $here\$programs, but that failed. `
+        I need that folder, so I can`'t go any further. `
+        Please investigate and fix the problem.")
+        exit 1
+    }
+}
 
 # Check to see if HandBrakeCLI has been installed,
 #    and if not, try to install it and remember where it is.
@@ -27,8 +45,12 @@ $HBname = "README.md"
 $HBname = "HandBrakeCLI.exe"
 $HBpath = ""
 
-if (Test-Path ".\$HBname") {
-    $HBpath = ".\$HBname"
+# Look for HandBrakeCLI in current folder\.programs
+# or somewhere in the PATH variable
+# else install it in $here\$programs
+#
+if (Test-Path ".\$programs\$HBname") {
+    $HBpath = ".\$programs\$HBname"
     if ($Verbose -match 'HB,') {
         $result = [System.windows.forms.messagebox]::show("The path to $HBname is `"$HBpath`".")
     }
@@ -90,7 +112,7 @@ else {
         # Now to download the file
         #
         try {
-            $Response = Invoke-WebRequest -Uri "$HBurl" -OutFile ".\$filename"
+            $Response = Invoke-WebRequest -Uri "$HBurl" -OutFile ".\$programs\$filename"
             # This will only execute if the Invoke-WebRequest is successful.
             $StatusCode = $Response.StatusCode
         } catch {
@@ -113,8 +135,7 @@ else {
         #
         $result = [System.windows.forms.messagebox]::show( `
         "I have downloaded `"$filename`" -- now I'll unpack the archive here.")
-
-
+        Expand-Archive -LiteralPath ".\$programs\$filename" -DestinationPath ".\$programs"
     }        
 }
 
@@ -126,8 +147,8 @@ $FileBrowser = New-Object System.Windows.Forms.OpenFileDialog -Property @{
 $null = $FileBrowser.ShowDialog()
 $vf = $FileBrowser.FileName
 $result = [System.windows.forms.messagebox]::show("The filename is `"$vf`".")
-exit
-# Exit-PSSession
+
+# 
 # $FileBrowser = New-Object System.Windows.Forms.OpenFileDialog -Property @{ 
 #     InitialDirectory = "C:\Users\jenni\Documents\P8CertCourse\arabic"
 #     Title = 'Select text file'} 
