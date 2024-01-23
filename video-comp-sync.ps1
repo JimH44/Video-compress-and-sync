@@ -1,11 +1,11 @@
 # video-comp-sync.ps1
 # of the video-compress-and-sync project
 #
-# Script to run HandBrakeCLI for users not familiar with command line
-# asks the user to select the video or audio file to compress
+# Script to run HandBrakeCLI for users not familiar with command line.
+# Asks the user to select the video file to compress
 # Then asks for the output folder that syncs with colleagues' machines
 # It will compress the video using built-in parameters, 
-# with output to the syncing folder
+# with output to the syncing folder.
 #
 # To help with debugging:
 # $Verbose = "HB,HBdownload,extract,"
@@ -22,7 +22,9 @@ Add-Type -AssemblyName System.Windows.Forms
 #
 $here = pwd
 $programs = ".programs"
-$syncfolder = "$here\SyncWithColleagues"
+$previous_sync_folder_file = $programs\previous_sync.txt
+$syncfoldername = "SyncWithColleagues"
+$syncfolder = "$here\$syncfoldername"
 
 # Make sure there is a folder to HandBrakeCLI to be in
 #
@@ -148,13 +150,36 @@ $null = $FileBrowser.ShowDialog()
 $vf = $FileBrowser.FileName
 $result = [System.windows.forms.messagebox]::show("The filename is `"$vf`".")
 
-# 
-# $FileBrowser = New-Object System.Windows.Forms.OpenFileDialog -Property @{ 
-#     InitialDirectory = "C:\Users\jenni\Documents\P8CertCourse\arabic"
-#     Title = 'Select text file'} 
-# $null = $FileBrowser.ShowDialog()
-# $tf = $FileBrowser.FileName
-# $srt1 = Split-Path -Path $tf -Parent 
-# $srt2 = ($tf).split('\')[-1] -replace '\.[^.]*$','' 
-# $srt=$srt1+"\"+$srt2+".srt"
-# cmd.exe /c "runaen-ar" $vf $tf $srt
+# Find out where to send the compressed file
+#
+# If this has been selected before,
+#    get the previous value.
+#
+if ((Test-Path "$previous_sync_folder_file")) {
+    if($file = Get-Content $previous_sync_folder_file 2>$null) {
+        if(-Not $syncfolder -eq $file) {
+            $syncfolder = $file
+        }
+    }
+}
+
+# Now to ask the user.
+#
+$result = [System.windows.forms.messagebox]::show( `
+"Now I'll show you where I think you want the compressed video to go `
+so it can synchronize to your colleagues. `
+If I got it wrong, please select a different folder.")
+
+$FileBrowser = New-Object System.Windows.Forms.OpenFileDialog -Property @{ 
+     InitialDirectory = "$here"
+     Title = 'Select folder for compressed video'
+     FileName = "$syncfoldername"} 
+$null = $FileBrowser.ShowDialog()
+$tf = $FileBrowser.FileName
+
+if ("$tf" -ne "$syncfolder") {
+    $syncfolder = $tf
+}
+
+# Check syncfolder is writable, and remember it for next time.
+#
