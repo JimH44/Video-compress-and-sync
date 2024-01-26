@@ -8,8 +8,8 @@
 # with output to the syncing folder.
 #
 # To help with debugging:
-# $Verbose = "HB,HBdownload,extract,"
-$Verbose = ""
+# $Verbose = "HB,HBdownload,extract,setsync,"
+$Verbose = "setsync,"
 
 # Set-ExecutionPolicy unrestricted
 
@@ -21,18 +21,26 @@ Add-Type -AssemblyName System.Windows.Forms
 # we'll get the current working directory.
 #
 $here = pwd
-$programs = ".programs"
-$previous_sync_folder_file = $programs\previous_sync.txt
+
+# some other assumptions:
+$LetUserChangeSyncFolder = $false
+$LetUserChangeSyncFolder = $true
+
+$support = ".support"     # folder to put HandbrakeCLI etc
+
+# for remembering previous selections
+#
+$previous_sync_folder_file = "$support\previous_sync.txt"
 $syncfoldername = "SyncWithColleagues"
 $syncfolder = "$here\$syncfoldername"
 
 # Make sure there is a folder to HandBrakeCLI to be in
 #
-if (-Not (Test-Path ".\$programs")) {
-    mkdir ".\$programs"
+if (-Not (Test-Path ".\$support")) {
+    mkdir ".\$support"
     if (-Not "$?") {
         $result = [System.windows.forms.messagebox]::show( `
-        "I tried to make $here\$programs, but that failed. `
+        "I tried to make $here\$support, but that failed. `
         I need that folder, so I can`'t go any further. `
         Please investigate and fix the problem.")
         exit 1
@@ -49,10 +57,10 @@ $HBpath = ""
 
 # Look for HandBrakeCLI in current folder\.programs
 # or somewhere in the PATH variable
-# else install it in $here\$programs
+# else install it in $here\$support
 #
-if (Test-Path ".\$programs\$HBname") {
-    $HBpath = ".\$programs\$HBname"
+if (Test-Path ".\$support\$HBname") {
+    $HBpath = ".\$support\$HBname"
     if ($Verbose -match 'HB,') {
         $result = [System.windows.forms.messagebox]::show("The path to $HBname is `"$HBpath`".")
     }
@@ -114,7 +122,7 @@ else {
         # Now to download the file
         #
         try {
-            $Response = Invoke-WebRequest -Uri "$HBurl" -OutFile ".\$programs\$filename"
+            $Response = Invoke-WebRequest -Uri "$HBurl" -OutFile ".\$support\$filename"
             # This will only execute if the Invoke-WebRequest is successful.
             $StatusCode = $Response.StatusCode
         } catch {
@@ -137,18 +145,9 @@ else {
         #
         $result = [System.windows.forms.messagebox]::show( `
         "I have downloaded `"$filename`" -- now I'll unpack the archive here.")
-        Expand-Archive -LiteralPath ".\$programs\$filename" -DestinationPath ".\$programs"
+        Expand-Archive -LiteralPath ".\$support\$filename" -DestinationPath ".\$support"
     }        
 }
-
-# For GUI file selection:
-#
-$FileBrowser = New-Object System.Windows.Forms.OpenFileDialog -Property @{ 
-    InitialDirectory = "$here"
-    Title = 'Select video file to compress'} 
-$null = $FileBrowser.ShowDialog()
-$vf = $FileBrowser.FileName
-$result = [System.windows.forms.messagebox]::show("The filename is `"$vf`".")
 
 # Find out where to send the compressed file
 #
@@ -163,23 +162,81 @@ if ((Test-Path "$previous_sync_folder_file")) {
     }
 }
 
-# Now to ask the user.
-#
-$result = [System.windows.forms.messagebox]::show( `
-"Now I'll show you where I think you want the compressed video to go `
-so it can synchronize to your colleagues. `
-If I got it wrong, please select a different folder.")
+if ($LetUserChangeSyncFolder) {
 
+    # Now to ask the user where the Sync folder is.
+    #
+    $result = [System.windows.forms.messagebox]::show( `
+    "Now I'll show you where I think you want the compressed video to go `
+    so it can synchronize to your colleagues. `
+    If I got it wrong, please select a different folder.")
+
+    $here
+    
+    [void] [System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms')
+    $dialog = New-Object System.Windows.Forms.FolderBrowserDialog -Property @{
+        RootFolder = 'Desktop'
+#        InitialDirectory = "$syncfolder"
+        ShowNewFolderButton = $false
+        # SelectedPath = "S:\Work"
+        SelectedPath = "$syncfolder"
+        Description = 'Select folder to put compressed video'
+    }
+    # $dialog.RootFolder = "$here"
+    # -Property 
+    #@{ 
+    #    InitialDirectory = "$here"
+    #    Description = 'Select folder to put compressed video'} 
+    $null = $dialog.ShowDialog()
+    $dialog.RootFolder
+    $dialog.SelectedPath
+    exit
+
+#    if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+#    $directoryName = $dialog.SelectedPath
+#    Write-Host "Directory selected is $directoryName"
+#}
+
+#    $FileBrowser = New-Object System.Windows.Forms.OpenFileDialog -Property @{ 
+#        InitialDirectory = "$here"
+#        Title = 'Select folder to put compressed video'
+#        FileName = "$syncfoldername"} 
+#    $null = $FileBrowser.ShowDialog()
+#    $tf = $FileBrowser.FileName
+
+    # If the user cancelled, quit
+    #
+    if ("$tf" -eq "$null") {
+        $result = [System.windows.forms.messagebox]::show( `
+        "It seems you want to cancel the job `
+        Goodbye.")
+        
+        exit 7
+    }
+
+    # If the user changes the sync directory,
+    #    remember that for next  time.
+    #
+    if ("$tf" -ne "$syncfolder") {
+        $syncfolder = $tf
+    }
+
+    # Check syncfolder is writable, and remember it for next time.
+    #
+    Try { [io.file]::OpenWrite("$syncfolder\thing.txt").close() }
+    Catch { Write-Warning "Unable to write to output file $outsyncfolder" }
+    exit
+} 
+
+# For GUI file selection of the video to compress:
+#
 $FileBrowser = New-Object System.Windows.Forms.OpenFileDialog -Property @{ 
-     InitialDirectory = "$here"
-     Title = 'Select folder for compressed video'
-     FileName = "$syncfoldername"} 
+    InitialDirectory = "$here"
+    Title = 'Select video file to compress'} 
 $null = $FileBrowser.ShowDialog()
-$tf = $FileBrowser.FileName
+$vf = $FileBrowser.FileName
+$result = [System.windows.forms.messagebox]::show("The filename is `"$vf`".")
 
-if ("$tf" -ne "$syncfolder") {
-    $syncfolder = $tf
-}
-
-# Check syncfolder is writable, and remember it for next time.
+# Now to compress the video
 #
+&$HBpath -e x264 -q 28 -r 15 -B 64 -X 1280 -O with -i for input file and -o for output file.
