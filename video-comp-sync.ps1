@@ -31,7 +31,7 @@ $support = ".support"     # folder to put HandbrakeCLI etc
 # for remembering previous selections
 #
 $previous_sync_folder_file = "$support\previous_sync.txt"
-$syncfoldername = "SyncWithColleagues"
+$syncfoldername = "SyncWithOthers"
 $syncfolder = "$here\$syncfoldername"
 
 # Make sure there is a folder to HandBrakeCLI to be in
@@ -168,10 +168,8 @@ if ($LetUserChangeSyncFolder) {
     #
     $result = [System.windows.forms.messagebox]::show( `
     "Now I'll show you where I think you want the compressed video to go `
-    so it can synchronize to your colleagues. `
+    so it can synchronize to your colleagues. Please scroll down to see it. `
     If I got it wrong, please select a different folder.")
-
-    $here
     
     [void] [System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms')
     $dialog = New-Object System.Windows.Forms.FolderBrowserDialog -Property @{
@@ -182,33 +180,15 @@ if ($LetUserChangeSyncFolder) {
         SelectedPath = "$syncfolder"
         Description = 'Select folder to put compressed video'
     }
-    # $dialog.RootFolder = "$here"
-    # -Property 
-    #@{ 
-    #    InitialDirectory = "$here"
-    #    Description = 'Select folder to put compressed video'} 
     $null = $dialog.ShowDialog()
-    $dialog.RootFolder
-    $dialog.SelectedPath
-    exit
-
-#    if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
-#    $directoryName = $dialog.SelectedPath
-#    Write-Host "Directory selected is $directoryName"
-#}
-
-#    $FileBrowser = New-Object System.Windows.Forms.OpenFileDialog -Property @{ 
-#        InitialDirectory = "$here"
-#        Title = 'Select folder to put compressed video'
-#        FileName = "$syncfoldername"} 
-#    $null = $FileBrowser.ShowDialog()
-#    $tf = $FileBrowser.FileName
+    $sf = $dialog.SelectedPath
+    $sf
 
     # If the user cancelled, quit
     #
-    if ("$tf" -eq "$null") {
+    if ("$sf" -eq "$null") {
         $result = [System.windows.forms.messagebox]::show( `
-        "It seems you want to cancel the job `
+        "It seems you want to cancel the job. You can run me again if you want to. `
         Goodbye.")
         
         exit 7
@@ -217,15 +197,24 @@ if ($LetUserChangeSyncFolder) {
     # If the user changes the sync directory,
     #    remember that for next  time.
     #
-    if ("$tf" -ne "$syncfolder") {
-        $syncfolder = $tf
-    }
+    if ("$sf" -ne "$syncfolder") {
+        $syncfolder = $sf
 
-    # Check syncfolder is writable, and remember it for next time.
-    #
-    Try { [io.file]::OpenWrite("$syncfolder\thing.txt").close() }
-    Catch { Write-Warning "Unable to write to output file $outsyncfolder" }
-    exit
+        # Check syncfolder is writable, and remember it for next time.
+        #
+        Try { [io.file]::OpenWrite("$syncfolder\thing.txt").close() }
+        Catch { Write-Warning "Unable to write to $outsyncfolder"
+            exit 6
+        }
+
+        try {
+            "$syncfolder" > $previous_sync_folder_file
+        }
+        catch {
+            Write-Warning "Unable to write to file $previous_sync_folder_file"
+            exit 7
+        }
+    }
 } 
 
 # For GUI file selection of the video to compress:
@@ -234,9 +223,19 @@ $FileBrowser = New-Object System.Windows.Forms.OpenFileDialog -Property @{
     InitialDirectory = "$here"
     Title = 'Select video file to compress'} 
 $null = $FileBrowser.ShowDialog()
-$vf = $FileBrowser.FileName
-$result = [System.windows.forms.messagebox]::show("The filename is `"$vf`".")
+$video_file_path = $FileBrowser.FileName
+$result = [System.windows.forms.messagebox]::show("The filename is `"$video_file_path`".")
+$video_file_name = Split-Path $video_file_path -leaf
+"$video_file_name"
 
 # Now to compress the video
 #
-&$HBpath -e x264 -q 28 -r 15 -B 64 -X 1280 -O with -i for input file and -o for output file.
+$result = [System.windows.forms.messagebox]::show("I'm ready to compressing the video now.")
+try {
+    &$HBpath -e x264 -q 28 -r 15 -B 64 -X 1280 -O with -i "$video_file_path" `
+        -o "$syncfolder\$video_file_name"
+}
+catch {
+    Write-Warning "Unable to compress video to "$syncfolder\$video_file_name""
+    exit 9
+}
