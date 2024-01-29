@@ -2,14 +2,19 @@
 # of the video-compress-and-sync project
 #
 # Script to run HandBrakeCLI for users not familiar with command line.
+# Depends on someone setting Resilio Sync between folder SyncWithOthers
+# and other machine or machines.
+# If the variable $LetUserChangeSyncFolder is true,
+#    asks for the output folder that syncs with colleagues' machines
+#    using GUI folder chooser
 # Asks the user to select the video file to compress
-# Then asks for the output folder that syncs with colleagues' machines
+#    using GUI file chooser
 # It will compress the video using built-in parameters, 
 # with output to the syncing folder.
 #
 # To help with debugging:
-# $Verbose = "HB,HBdownload,extract,setsync,"
-$Verbose = "setsync,"
+# $Verbose = "HB,HBdownload,extract,"
+$Verbose = ""
 
 # Set-ExecutionPolicy unrestricted
 
@@ -34,7 +39,7 @@ $previous_sync_folder_file = "$support\previous_sync.txt"
 $syncfoldername = "SyncWithOthers"
 $syncfolder = "$here\$syncfoldername"
 
-# Make sure there is a folder to HandBrakeCLI to be in
+# Make sure there is a folder for HandBrakeCLI to be in
 #
 if (-Not (Test-Path ".\$support")) {
     mkdir ".\$support"
@@ -50,12 +55,12 @@ if (-Not (Test-Path ".\$support")) {
 # Check to see if HandBrakeCLI has been installed,
 #    and if not, try to install it and remember where it is.
 #
-$HBname = "Notepad.exe"
-$HBname = "README.md"
+# $HBname = "Notepad.exe"
+# $HBname = "README.md"
 $HBname = "HandBrakeCLI.exe"
 $HBpath = ""
 
-# Look for HandBrakeCLI in current folder\.programs
+# Look for HandBrakeCLI in current folder\$support
 # or somewhere in the PATH variable
 # else install it in $here\$support
 #
@@ -67,7 +72,6 @@ if (Test-Path ".\$support\$HBname") {
 }
 else {
     $HBpath = (Get-Command "$HBname" -ErrorAction SilentlyContinue | Select-Object Source).Source
-    # $result = [System.windows.forms.messagebox]::show("After test, the path to $HBname is `"$HBpath`".")
     
     if ($HBpath -ne $null ) {  
         if ($Verbose -match 'HB,') {
@@ -83,7 +87,6 @@ else {
         $Response = Invoke-WebRequest -URI "https://handbrake.fr/downloads2.php"
         if ($Verbose -match 'HBdownload,') {
             $Response.Links.href
-            # $result = [System.windows.forms.messagebox]::show("Response is `"$Response.Links.href`".")
         }
         $filename  = [regex]::match($Response.Links.href,'file=(HandBrakeCLI-[\d\.]+-win-x86_64.zip)').Groups[1].Value
         if ($filename) {
@@ -107,8 +110,6 @@ else {
             $HBversion
         }
 
-        # $downloadURI = Invoke-WebRequest -Uri "https://handbrake.fr/rotation.php?file=$filename"
-        # $downloadURI
         $HBurl = "https://github.com/HandBrake/HandBrake/releases/download/$HBversion/$filename"
         $HBversion  = [regex]::match($filename,'HandBrakeCLI-([\d\.]+)-win-x86_64.zip').Groups[1].Value
         if ($Verbose -match 'HBdownload,') {
@@ -174,9 +175,7 @@ if ($LetUserChangeSyncFolder) {
     [void] [System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms')
     $dialog = New-Object System.Windows.Forms.FolderBrowserDialog -Property @{
         RootFolder = 'Desktop'
-#        InitialDirectory = "$syncfolder"
         ShowNewFolderButton = $false
-        # SelectedPath = "S:\Work"
         SelectedPath = "$syncfolder"
         Description = 'Select folder to put compressed video'
     }
@@ -230,7 +229,10 @@ $video_file_name = Split-Path $video_file_path -leaf
 
 # Now to compress the video
 #
-$result = [System.windows.forms.messagebox]::show("I'm ready to compressing the video now.")
+$result = [System.windows.forms.messagebox]::show("I'm ready to compress the video now. `
+    Please leave the computer running until the blue window goes away, `
+    and then also leave it on and connected to the internet so the compressed video `
+    can sync to your colleagues.")
 try {
     &$HBpath -e x264 -q 28 -r 15 -B 64 -X 1280 -O with -i "$video_file_path" `
         -o "$syncfolder\$video_file_name"
