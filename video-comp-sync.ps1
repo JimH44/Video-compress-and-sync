@@ -73,7 +73,7 @@ if (Test-Path ".\$support\$HBname") {
 else {
     $HBpath = (Get-Command "$HBname" -ErrorAction SilentlyContinue | Select-Object Source).Source
     
-    if ($HBpath -ne $null ) {  
+    if ($null -ne $HBpath) {  
         if ($Verbose -match 'HB,') {
             $result = [System.windows.forms.messagebox]::show("The path to $HBname is `"$HBpath`".")            
         }
@@ -185,7 +185,7 @@ if ($LetUserChangeSyncFolder) {
 
     # If the user cancelled, quit
     #
-    if ("$sf" -eq "$null") {
+    if ("$null" -eq "$sf") {
         $result = [System.windows.forms.messagebox]::show( `
         "It seems you want to cancel the job. You can run me again if you want to. `
         Goodbye.")
