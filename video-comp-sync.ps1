@@ -60,11 +60,18 @@ if (-Not (Test-Path ".\$support")) {
 $HBname = "HandBrakeCLI.exe"
 $HBpath = ""
 
-# Look for HandBrakeCLI in current folder\$support
+# Look for HandBrakeCLI in current folder
+# or current folder\$support
 # or somewhere in the PATH variable
 # else install it in $here\$support
 #
-if (Test-Path ".\$support\$HBname") {
+if (Test-Path ".\$HBname") {
+    $HBpath = ".\$HBname"
+    if ($Verbose -match 'HB,') {
+        $result = [System.windows.forms.messagebox]::show("The path to $HBname is `"$HBpath`".")
+    }
+}
+elseif (Test-Path ".\$support\$HBname") {
     $HBpath = ".\$support\$HBname"
     if ($Verbose -match 'HB,') {
         $result = [System.windows.forms.messagebox]::show("The path to $HBname is `"$HBpath`".")
