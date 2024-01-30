@@ -186,19 +186,15 @@ if ($LetUserChangeSyncFolder) {
         SelectedPath = "$syncfolder"
         Description = 'Select folder to put compressed video'
     }
-    $null = $dialog.ShowDialog()
-    $sf = $dialog.SelectedPath
-    $sf
-
-    # If the user cancelled, quit
+    $result = $dialog.ShowDialog()
+    # If the user cancelled, leave $syncfolder unchanged.
     #
-    if ("$null" -eq "$sf") {
+    if ("$result" -eq [System.Windows.Forms.DialogResult]::Cancel) {
         $result = [System.windows.forms.messagebox]::show( `
-        "It seems you want to cancel the job. You can run me again if you want to. `
-        Goodbye.")
-        
-        exit 7
+        "OK, I`'ll leave the folder for compressed videos `
+        as `"$syncfolder`".")
     }
+    else {$sf = $dialog.SelectedPath}
 
     # If the user changes the sync directory,
     #    remember that for next  time.
@@ -228,11 +224,17 @@ if ($LetUserChangeSyncFolder) {
 $FileBrowser = New-Object System.Windows.Forms.OpenFileDialog -Property @{ 
     InitialDirectory = "$here"
     Title = 'Select video file to compress'} 
-$null = $FileBrowser.ShowDialog()
+$result = $FileBrowser.ShowDialog()
 $video_file_path = $FileBrowser.FileName
 $result = [System.windows.forms.messagebox]::show("The filename is `"$video_file_path`".")
 $video_file_name = Split-Path $video_file_path -leaf
 "$video_file_name"
+
+if ("$result" -eq [System.Windows.Forms.DialogResult]::Cancel) {
+    $result = [System.windows.forms.messagebox]::show( `
+    "No video selected. Goodbye.")
+    exit 10
+}
 
 # Now to compress the video
 #
