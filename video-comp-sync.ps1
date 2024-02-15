@@ -2,18 +2,29 @@
 # of the video-compress-and-sync project
 #
 # Script to run HandBrakeCLI for users not familiar with command line.
-# Depends on someone setting Resilio Sync between folder SyncWithOthers
-# and other machine or machines.
+# The output can be to the same folder with "-comp" added to the filename
+# or to a different folder, which could be set up to sync automatically
+# to colleagues. Set $OutputToSeparateFolder = $true for 2nd option.
+#
+# Syncing would depend on someone setting up something like Resilio Sync 
+# between folder SyncWithOthers and other machine or machines.
+#
 # If the variable $LetUserChangeSyncFolder is true,
 #    asks for the output folder that syncs with colleagues' machines
 #    using GUI folder chooser
+#
 # Asks the user to select the video file to compress
 #    using GUI file chooser
-# It will compress the video using built-in parameters, 
-# with output to the syncing folder.
+# It will compress the video using built-in parameters.
 #
+# Control variables:
+#
+$OutputToSeparateFolder = $false
+$LetUserChangeSyncFolder = $false
+# $LetUserChangeSyncFolder = $true
+
 # To help with debugging:
-# $Verbose = "HB,HBdownload,extract,"
+# $Verbose = "HB,HBdownload,extract,ShowFname,"
 $Verbose = ""
 
 # Set-ExecutionPolicy unrestricted
@@ -26,10 +37,6 @@ Add-Type -AssemblyName System.Windows.Forms
 # we'll get the current working directory.
 #
 $here = pwd
-
-# some other assumptions:
-$LetUserChangeSyncFolder = $false
-$LetUserChangeSyncFolder = $true
 
 $support = ".support"     # folder to put HandbrakeCLI etc
 
@@ -157,67 +164,78 @@ else {
     }        
 }
 
-# Find out where to send the compressed file
+# If writing output to a separate folder . . .
 #
-# If this has been selected before,
-#    get the previous value.
-#
-if ((Test-Path "$previous_sync_folder_file")) {
-    if($file = Get-Content $previous_sync_folder_file 2>$null) {
-        if(-Not $syncfolder -eq $file) {
-            $syncfolder = $file
+$ifsync = ""
+
+if ($OutputToSeparateFolder) {
+
+    # Find out where to send the compressed file
+    #
+    # If this has been selected before,
+    #    get the previous value.
+    #
+    if ((Test-Path "$previous_sync_folder_file")) {
+        if($file = Get-Content $previous_sync_folder_file 2>$null) {
+            if(-Not $syncfolder -eq $file) {
+                $syncfolder = $file
+            }
         }
     }
-}
 
-if ($LetUserChangeSyncFolder) {
+    if ($LetUserChangeSyncFolder) {
 
-    # Now to ask the user where the Sync folder is.
-    #
-    $result = [System.windows.forms.messagebox]::show( `
-    "Now I'll show you where I think you want the compressed video to go `
-    so it can synchronize to your colleagues. Please scroll down to see it. `
-    If I got it wrong, please select a different folder.")
-    
-    [void] [System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms')
-    $dialog = New-Object System.Windows.Forms.FolderBrowserDialog -Property @{
-        RootFolder = 'Desktop'
-        ShowNewFolderButton = $false
-        SelectedPath = "$syncfolder"
-        Description = 'Select folder to put compressed video'
-    }
-    $result = $dialog.ShowDialog()
-    # If the user cancelled, leave $syncfolder unchanged.
-    #
-    if ("$result" -eq [System.Windows.Forms.DialogResult]::Cancel) {
-        $result = [System.windows.forms.messagebox]::show( `
-        "OK, I`'ll leave the folder for compressed videos `
-        as `"$syncfolder`".")
-    }
-    else {$sf = $dialog.SelectedPath}
-
-    # If the user changes the sync directory,
-    #    remember that for next  time.
-    #
-    if ("$sf" -ne "$syncfolder") {
-        $syncfolder = $sf
-
-        # Check syncfolder is writable, and remember it for next time.
+        # Now to ask the user where the Sync folder is.
         #
-        Try { [io.file]::OpenWrite("$syncfolder\thing.txt").close() }
-        Catch { Write-Warning "Unable to write to $outsyncfolder"
-            exit 6
+        $result = [System.windows.forms.messagebox]::show( `
+        "Now I'll show you where I think you want the compressed video to go `
+        so it can synchronize to your colleagues. Please scroll down to see it. `
+        If I got it wrong, please select a different folder.")
+        
+        [void] [System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms')
+        $dialog = New-Object System.Windows.Forms.FolderBrowserDialog -Property @{
+            RootFolder = 'Desktop'
+            ShowNewFolderButton = $false
+            SelectedPath = "$syncfolder"
+            Description = 'Select folder to put compressed video'
         }
+        $result = $dialog.ShowDialog()
+        # If the user cancelled, leave $syncfolder unchanged.
+        #
+        if ("$result" -eq [System.Windows.Forms.DialogResult]::Cancel) {
+            $result = [System.windows.forms.messagebox]::show( `
+            "OK, I`'ll leave the folder for compressed videos `
+            as `"$syncfolder`".")
+        }
+        else {$sf = $dialog.SelectedPath}
 
-        try {
-            "$syncfolder" > $previous_sync_folder_file
+        # If the user changes the sync directory,
+        #    remember that for next  time.
+        #
+        if ("$sf" -ne "$syncfolder") {
+            $syncfolder = $sf
+
+            # Check syncfolder is writable, and remember it for next time.
+            #
+            Try { [io.file]::OpenWrite("$syncfolder\thing.txt").close() }
+            Catch { Write-Warning "Unable to write to $outsyncfolder"
+                exit 6
+            }
+
+            try {
+                "$syncfolder" > $previous_sync_folder_file
+            }
+            catch {
+                Write-Warning "Unable to write to file $previous_sync_folder_file"
+                exit 7
+            }
         }
-        catch {
-            Write-Warning "Unable to write to file $previous_sync_folder_file"
-            exit 7
-        }
-    }
-} 
+    } 
+    $ifsync = "Then also leave it on and connected to the internet so the compressed video `
+    can sync to your colleagues."
+} else {
+    $syncfolder = "."
+}
 
 # For GUI file selection of the video to compress:
 #
@@ -233,20 +251,32 @@ if ("$result" -eq [System.Windows.Forms.DialogResult]::Cancel) {
     exit 10
 } else {"$result"}
 
-$result = [System.windows.forms.messagebox]::show("The filename is `"$video_file_path`".")
+if ($Verbose -match 'ShowFname,') {
+    $result = [System.windows.forms.messagebox]::show("The filename is `"$video_file_path`".")
+}
 $video_file_name = Split-Path $video_file_path -leaf
+$basename = (Get-Item "$video_file_name" ).Basename
+$extension = (Get-Item "$video_file_name" ).Extension
+$basename += "-comp"
 
 # Now to compress the video
 #
 $result = [System.windows.forms.messagebox]::show("I'm ready to compress the video now. `
-    Please leave the computer running until the blue window goes away, `
-    and then also leave it on and connected to the internet so the compressed video `
-    can sync to your colleagues.")
-try {
-    &$HBpath -e x264 -q 28 -r 15 -B 64 -X 1280 -O with -i "$video_file_path" `
-        -o "$syncfolder\$video_file_name"
-}
-catch {
-    Write-Warning "Unable to compress video to "$syncfolder\$video_file_name""
-    exit 9
+    Input:     $video_file_name `
+    Output: $syncfolder\$basename$extension `
+    Please leave the computer running until the blue window goes away. `
+    $ifsync ", "Ready to compress . . .", "OKCancel")
+
+if ($result-eq 1) {
+    try {
+        &$HBpath -e x264 -q 28 -r 15 -B 64 -X 1280 -O with -i "$video_file_path" `
+            -o "$syncfolder\$basename$extension"
+    }
+    catch {
+        Write-Warning "Unable to compress video to "$syncfolder\$video_file_name""
+        exit 9
+    }
+} else {
+    $result = [System.windows.forms.messagebox]::show("Compression job cancelled.")
+    exit 19
 }
