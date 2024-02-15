@@ -226,15 +226,15 @@ $FileBrowser = New-Object System.Windows.Forms.OpenFileDialog -Property @{
     Title = 'Select video file to compress'} 
 $result = $FileBrowser.ShowDialog()
 $video_file_path = $FileBrowser.FileName
-$result = [System.windows.forms.messagebox]::show("The filename is `"$video_file_path`".")
-$video_file_name = Split-Path $video_file_path -leaf
-"$video_file_name"
 
 if ("$result" -eq [System.Windows.Forms.DialogResult]::Cancel) {
     $result = [System.windows.forms.messagebox]::show( `
     "No video selected. Goodbye.")
     exit 10
-}
+} else {"$result"}
+
+$result = [System.windows.forms.messagebox]::show("The filename is `"$video_file_path`".")
+$video_file_name = Split-Path $video_file_path -leaf
 
 # Now to compress the video
 #
